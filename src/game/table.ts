@@ -1,5 +1,6 @@
 import { Player } from './player';
 import { Deal } from './deal';
+import { Logger, LogType } from './logger';
 
 export class Table {
   get activePlayers() { return this._players.filter(p => p.stack > 0) }
@@ -17,8 +18,19 @@ export class Table {
     this._players.push(player);
   }
 
-  nextDeal() {
-    const deal = new Deal(this.activePlayers)
-    deal.play()
+  async nextDeal(logger?: Logger) {
+    if (logger) {
+      let players = ''
+      for(let player of this.activePlayers) {
+        players += ` ${player.id}`
+      }
+      logger.log(LogType.TableLog, `New deal. Players:${players}`);
+      logger.log(LogType.TableLog, `BTN: ${this.activePlayers[0].id}`)
+    }
+    this.shiftPosition()
+    const deal = new Deal(this.activePlayers);
+    await deal.play(logger)
+    if (logger)
+      logger.log(LogType.TableLog, 'Deal finished. Cleaning up.')
   }
 }

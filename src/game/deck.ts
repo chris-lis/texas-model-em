@@ -34,9 +34,6 @@ export class Deck {
     const deck: Card[] = [];
     for (let value = 2; value < 15; value++) {
       for (let suit = 0; suit < 4; suit++) {
-        if (!isNaN(Number(suit))) {
-          continue;
-        }
         deck.push({
           value,
           suit,
@@ -72,3 +69,14 @@ export class Deck {
   }
 }
 
+export function printCard(card: Card) {
+  return `${CardValue[card.value]} of ${CardSuit[card.suit]}`;
+}
+
+export function printCards(cards: Card[]) {
+  let out = '';
+  for(let i = 0; i < cards.length; i++) {
+    out += (i === 0 ? '' : ' ') + printCard(cards[i]);
+  }
+  return out;
+}

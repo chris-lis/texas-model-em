@@ -1,7 +1,8 @@
 import { Player } from './player';
-import { Pot, BettingRound, Action, TotalPot } from './betting';
-import { Card, Deck } from './deck';
-import { Hand, findBestHand, compareHands, HandResult } from './hand';
+import { Pot, BettingRound, Action, TotalPot } from './pot';
+import { Card, Deck, printCard, printCards } from './deck';
+import { Hand, findBestHand, compareHands, HandResult, HandRank } from './hand';
+import { Logger, LogType } from './logger';
 
 
 export enum TablePosition {
@@ -25,15 +26,23 @@ export class Deal {
     
   }
 
-  async play() {
+  async play(logger?: Logger) {
     for (let i = 0; i < 4; i++) {
-      let winners = this.playRound()
+      let winners = await this.playRound(logger)
       if (winners)
         break;
     }
   }
 
-  async playRound() {
+  async playRound(logger?: Logger) {
+    if (logger) {
+      let players = ''
+      for (let player of this.activePlayers) {
+        players += ` ${player.id}`
+      }
+      logger.log(LogType.DealLog, `Starting next round: ${BettingRound[this.currentRound]} with players:${players}`)
+    }
+
     // TODO: Validation 
     let bettingQueue = this.activePlayers;
     let afterBettingQueue: Player[] = [] 
@@ -45,13 +54,14 @@ export class Deal {
         bb = bettingQueue.shift();
         sb = bettingQueue.shift();
       }
-      sb = bettingQueue.shift();
-      bb = bettingQueue.shift();
+      else {
+        sb = bettingQueue.shift();
+        bb = bettingQueue.shift();
+      }
       if (!sb || !bb)
-        throw new Error('[TABLE_ERROR] SB and/or BB is undefined!')
-      
-      this.pot.addBet(sb.smallBlind());
-      this.pot.addBet(bb.bigBlind());
+        throw new Error('[DEAL_ERROR] SB and/or BB is undefined!')
+      this.pot.addBet(sb.smallBlind(), logger);
+      this.pot.addBet(bb.bigBlind(), logger);
       bettingQueue.push(sb);
       bettingQueue.push(bb);
       for (let i = 0; i < 2; i++) {
@@ -61,33 +71,43 @@ export class Deal {
       }
     }
     else {
-      this.pot.nextRound();
       if (this.currentRound === BettingRound.Flop) {
         // Burn card (poker tradition)
         this.deck.deal();
         for (let i = 0; i < 3; i++) {
-          this.board.push(this.deck.deal());
+          const card = this.deck.deal()
+          this.board.push(card);
+          if (logger) {
+            logger.log(LogType.DealLog, `${printCard(card)} has been dealt to the board.`)
+          }
         }
       }
       else {
         // Burn card again
         this.deck.deal();
-        this.board.push(this.deck.deal());
+        const card = this.deck.deal()
+        this.board.push(card);
+        if (logger) {
+          logger.log(LogType.DealLog, `${printCard(card)} has been dealt to the board.`)
+        }
       }
     }
 
     while (bettingQueue.length > 0) {
       if (this.players.length === 1) {
-        this.pot.dividePot([this.players[0]]);
+        if (logger) {
+          logger.log(LogType.DealLog, 'Deal has been folded out.')
+        }
+        this.pot.dividePot([this.players], logger);
         return this.players[0];
       }
       let actingPlayer = bettingQueue.shift();
       if (!actingPlayer)
-        throw new Error('[TABLE_ERROR] Acting player doesnt exist!')
+        throw new Error('[DEAL_ERROR] Acting player doesnt exist!')
       
       // TODO: Figure out what goes into Player.decide() method 
       const bet = actingPlayer.decide(this.pot, this.board);
-      this.pot.addBet(bet);
+      this.pot.addBet(bet, logger);
       switch (bet.action) {
         case (Action.Bet):
         case (Action.Raise):
@@ -102,38 +122,46 @@ export class Deal {
     }
 
     if (this.currentRound === BettingRound.River)
-      return await this.showdown()
+      return await this.showdown(logger)
+    
+    this.pot.nextRound();    
   }
 
-  public async showdown() {
+  public async showdown(logger?: Logger) {
     // TODO: Allow 'mucking' 
-    const hands: { player: Player, hand: Hand, draw?: boolean }[] = []
-    for(let player of this.players) {
+    if (logger) {
+      logger.log(LogType.DealLog, 'Show of hands!')
+    }
+    const hands: { player: Player, hand: Hand }[] = []
+    for (let player of this.players) {
+      const hand = await findBestHand(player.hand, this.board)
+      if (logger) {
+        logger.log(LogType.DealLog, `${player.id} has ${HandRank[hand.rank]}: ${printCards(hand.cards)}`);
+      }
       hands.push({
         player: player,
-        hand: await findBestHand(player.hand, this.board)
+        hand,
       })
     }
-    hands.sort((h1, h2) => {
-      const res = compareHands(h1.hand, h1.hand);
-      if (res === HandResult.Draw) {
-        h1.draw = true;
-        h2.draw = true;
-        return 0;
+    hands.sort((h1, h2) => compareHands(h1.hand, h2.hand) === HandResult.Hand1IsBetter ? -1 : 1)
+
+    const playersRanked: Player[][] = [];
+    let tempPlayers: { player: Player, hand: Hand }[] = []
+    for (let hand of hands) {
+      if (tempPlayers.length === 0) {
+        tempPlayers.push(hand);
       }
-      else
-       return res === HandResult.Hand1IsBetter ? -1 : 1
-    })
-    const draw: number[] = [];
-    const playersRanked: Player[] = [];
-    for (let i = 0; i < hands.length; i++) {
-      let hand = hands[i];
-      if (hand.draw) {
-        draw.push(i)
+      else {
+        if (compareHands(tempPlayers[0].hand, hand.hand) === HandResult.Draw)
+          tempPlayers.push(hand)
+        else {
+          playersRanked.push(tempPlayers.map(t => t.player))
+          tempPlayers = [hand]
+        }
       }
-      playersRanked.push(hand.player)
     }
-    this.pot.dividePot(playersRanked, draw)
+    playersRanked.push(tempPlayers.map(t => t.player))
+    this.pot.dividePot(playersRanked, logger)
     return hands;
   }
 }

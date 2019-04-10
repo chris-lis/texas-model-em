@@ -59,10 +59,10 @@ export async function findBestHand(
   if (flush) {
     straight = await checkForStraight(flush);
     if (straight) {
-      return { rank: HandRank.StraightFlush, cards: straight.slice(0, 5) };
+      return { rank: HandRank.StraightFlush, cards: straight.reverse().slice(0, 5) };
     }
 
-    flush = flush.slice(0, 5);
+    flush = flush.reverse();
   } else {
     straight = await checkForStraight(cards);
   }
@@ -108,7 +108,7 @@ export async function findBestHand(
     return { rank: HandRank.Flush, cards: flush.slice(0, 5) };
   }
   if (straight) {
-    return { rank: HandRank.Straight, cards: straight.slice(0, 5) };
+    return { rank: HandRank.Straight, cards: straight.reverse().slice(0, 5) };
   }
   // Check for pair or two pairs
   if (maxRep) {
@@ -117,7 +117,7 @@ export async function findBestHand(
       cards.sort((a, b) => (a.value > b.value ? -1 : 1));
       const res = maxRep.concat(secRep);
       for (const card of cards) {
-        if (card.value !== maxRep[0].value) {
+        if (card.value !== maxRep[0].value && card.value !== secRep[0].value) {
           return { rank: HandRank.TwoPairs, cards: res.concat([card]) };
         }
       }
@@ -214,6 +214,6 @@ function checkForRepeats(cards: Card[]) {
 
   repeatsMap.forEach(rep => rep.length >= 2 && repeats.push(rep));
   return repeats.sort((r1, r2) =>
-    r1.length > r2.length ? -1 : r1[0].value > r2[0].value ? -1 : 0
+    r1.length > r2.length ? -1 : r1.length < r2.length ? 1 : r1[0].value > r2[0].value ? -1 : 0
   );
 }

@@ -1,16 +1,17 @@
 import { Card } from './deck';
-import { Action, Bet } from './betting';
+import { Action, Bet, TotalPot } from './pot';
 import { TablePosition } from './deal';
 
 export interface PlayerStrategy { }
 
 
 export interface Player {
+  id: string;
   hand: Card[];
   playerStrategies: Map<Player, PlayerStrategy>;
   stack: number;
   position: TablePosition;
-  decide(...args: any[]): Bet;
+  decide(pot: TotalPot, board: Card[]): Bet;
   smallBlind(): Bet;
   bigBlind(): Bet;
   winPot(amount: number): void
@@ -22,12 +23,18 @@ export class AIPlayer implements Player {
   public hand: Card[] = [];
   public playerStrategies = new Map<Player, PlayerStrategy>();
 
-  constructor(public stack: number, public position: TablePosition) {}
+  constructor(public stack: number, public position: TablePosition, public id: string) {}
 
-  public decide(...args: any[]): Bet {
+  public decide(pot: TotalPot, board: Card[]): Bet {
+    const amountInPot = pot.currentPot.players.get(this as Player);
+    if (amountInPot === undefined) 
+      throw new Error('[PLAYER_ERROR] Player doenst belong to the pot!')
+
+    const amount = pot.currentBet - amountInPot;
+    this.bet(amount);
     return {
-      amount: 0,
-      action: Action.Fold,
+      amount: amount,
+      action: amount === 0 ? Action.Check : Action.Call,
       player: this as Player,
     }
   }
@@ -77,15 +84,15 @@ export class HumanPlayer implements Player {
   public hand: Card[] = [];
   public playerStrategies = new Map<Player, PlayerStrategy>();
 
-  constructor(public stack: number, public position: TablePosition) { }
+  constructor(public stack: number, public position: TablePosition, public id: string, public decide: (...args: any[]) => Bet) { }
 
-  public decide(...args: any[]): Bet {
-    return {
-      amount: 0,
-      action: Action.Fold,
-      player: this as Player,
-    }
-  }
+  // public decide(...args: any[]): Bet {
+  //   return {
+  //     amount: 0,
+  //     action: Action.Fold,
+  //     player: this as Player,
+  //   }
+  // }
 
   protected bet(amount: number) {
     if (this.stack < 1) {
