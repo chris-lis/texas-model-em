@@ -42,8 +42,8 @@ export class TotalPot {
   protected _betHistory: Bet[] = [];
   
   protected get _currentPot(): Pot { return this._subpots[this._subpots.length - 1] }
-  get players() { return [...this._players] }
-  get activePlayers() { return this.players.filter(p => !p.allIn).map(p => p.player) }
+  get players() { return this._players.map(p => p.player) }
+  get activePlayers() { return this._players.filter(p => !p.allIn).map(p => p.player) }
   get currentPot() { return {...this._currentPot} }
   get size() { return this._size };
   get currentBet() { return this._currentPot.currentBet }
@@ -56,7 +56,7 @@ export class TotalPot {
     this._subpots = [this.createPot(players, BettingRound.Preflop)];
   }
 
-  public addBet(bet: Bet) {
+  addBet(bet: Bet) {
     // TODO: validation
     switch (bet.action) {
       case (Action.Check):
@@ -86,10 +86,28 @@ export class TotalPot {
     this._betHistory.push(bet);
   }
 
-  public nextRound() {
+  nextRound() {
     // TODO: validation 
     this.createPot(this.activePlayers, this.currentRound + 1)
   }
+
+  dividePot(playersRanked: Player[], draw?: number[]) {
+    for(let pot of this._subpots) {
+      for (let i = 0; i < playersRanked.length; i++) {
+        const player = playersRanked[i]
+        if (pot.players.get(player)) {
+          if (draw && draw.includes(i)) {
+            player.winPot(pot.size / draw.length)
+          }
+          else {
+            player.winPot(pot.size)
+            break;
+          }
+        }
+      }
+    }
+  }
+  
 
   private increasePot(bet: Bet, raise?: boolean) {
     const currentBet = this._currentPot.players.get(bet.player);
