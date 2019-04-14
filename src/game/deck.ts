@@ -70,7 +70,42 @@ export class Deck {
 }
 
 export function printCard(card: Card) {
-  return `${CardValue[card.value]} of ${CardSuit[card.suit]}`;
+  let out = '';
+  if (card.value < 11) {
+    out += card.value;
+  }
+  else {
+    switch (card.value) {
+      case (CardValue.Jack):
+        out += 'J';
+        break;
+      case (CardValue.Queen):
+        out += 'Q';
+        break;
+      case (CardValue.King):
+        out += 'K';
+        break;
+      case (CardValue.Ace):
+        out += 'A';
+        break;
+    }
+  }
+  switch (card.suit) {
+    case (CardSuit.Clubs):
+      out += '♣'
+      break;
+    case (CardSuit.Diamonds):
+      out += '♢'
+      break;
+    case (CardSuit.Hearts):
+      out += '♡'
+      break;
+    case (CardSuit.Spades):
+      out += '♠'
+      break;
+  }
+
+  return out;
 }
 
 export function printCards(cards: Card[]) {

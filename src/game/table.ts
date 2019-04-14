@@ -3,11 +3,17 @@ import { Deal } from './deal';
 import { Logger, LogType } from './logger';
 
 export class Table {
+  get players() { return {...this._players}}
   get activePlayers() { return this._players.filter(p => p.stack > 0) }
   constructor(protected _players: Player[]) {
     let btn = Math.floor(Math.random() * _players.length);
     for (let i = 0; i < btn; i++) {
       this.shiftPosition();
+    }
+    this.updateStats = () => {
+      for (let player of _players) {
+        player.updateStats()
+      }
     }
   }
 
@@ -28,9 +34,11 @@ export class Table {
       logger.log(LogType.TableLog, `BTN: ${this.activePlayers[0].id}`)
     }
     this.shiftPosition()
-    const deal = new Deal(this.activePlayers);
+    const deal = new Deal(this.activePlayers, this.updateStats);
     await deal.play(logger)
     if (logger)
       logger.log(LogType.TableLog, 'Deal finished. Cleaning up.')
   }
+
+  updateStats: () => void;
 }

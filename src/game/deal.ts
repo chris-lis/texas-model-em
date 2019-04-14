@@ -18,8 +18,8 @@ export class Deal {
   get activePlayers() { return this.pot.activePlayers }
   get currentRound() { return this.pot.currentRound }
   
-  constructor(players: Player[]) { 
-    this.pot = new TotalPot(players);
+  constructor(players: Player[], public updateStats: () => void) { 
+    this.pot = new TotalPot(players, (type: LogType, message: string) => {});
     for(let player of players) {
       player.returnCards();
     }
@@ -35,6 +35,7 @@ export class Deal {
   }
 
   async playRound(logger?: Logger) {
+    this.updateStats();
     if (logger) {
       let players = ''
       for (let player of this.activePlayers) {
@@ -60,13 +61,16 @@ export class Deal {
       }
       if (!sb || !bb)
         throw new Error('[DEAL_ERROR] SB and/or BB is undefined!')
-      this.pot.addBet(sb.smallBlind(), logger);
-      this.pot.addBet(bb.bigBlind(), logger);
+      this.pot.addBet(sb.smallBlind());
+      sb.updateStats();
+      this.pot.addBet(bb.bigBlind());
+      bb.updateStats();
       bettingQueue.push(sb);
       bettingQueue.push(bb);
       for (let i = 0; i < 2; i++) {
         for (let player of this.activePlayers) {
           player.recieveCard(this.deck.deal())
+          player.updateStats();
         }
       }
     }
@@ -94,11 +98,13 @@ export class Deal {
     }
 
     while (bettingQueue.length > 0) {
+      this.updateStats()
       if (this.players.length === 1) {
         if (logger) {
           logger.log(LogType.DealLog, 'Deal has been folded out.')
         }
-        this.pot.dividePot([this.players], logger);
+        this.pot.dividePot([this.players]);
+        this.updateStats()
         return this.players[0];
       }
       let actingPlayer = bettingQueue.shift();
@@ -107,7 +113,7 @@ export class Deal {
       
       // TODO: Figure out what goes into Player.decide() method 
       const bet = actingPlayer.decide(this.pot, this.board);
-      this.pot.addBet(bet, logger);
+      this.pot.addBet(bet);
       switch (bet.action) {
         case (Action.Bet):
         case (Action.Raise):
@@ -121,6 +127,7 @@ export class Deal {
       }
     }
 
+    this.updateStats()
     if (this.currentRound === BettingRound.River)
       return await this.showdown(logger)
     
@@ -161,7 +168,8 @@ export class Deal {
       }
     }
     playersRanked.push(tempPlayers.map(t => t.player))
-    this.pot.dividePot(playersRanked, logger)
+    this.pot.dividePot(playersRanked)
+    this.updateStats();
     return hands;
   }
 }

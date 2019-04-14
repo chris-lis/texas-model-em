@@ -17,6 +17,7 @@ export enum BettingRound {
   Flop,
   Turn,
   River,
+  Showdown
 }
 
 export interface Bet {
@@ -52,59 +53,49 @@ export class TotalPot {
   get currentRound() { return this._currentPot.round }
   get betHistory() { return [...this._betHistory] }
 
-  constructor(players: Player[]) {
+  constructor(players: Player[], public log: (type: LogType, message: string) => void) {
     this._players = players.map(player => ({ player }));
     this._subpots = [this.createPot(players, BettingRound.Preflop)];
   }
 
-  addBet(bet: Bet, logger?: Logger) {
+  addBet(bet: Bet) {
     // TODO: validation 
     switch (bet.action) {
       case (Action.Check):
-        if (logger) {
-          logger.log(LogType.PotLog, `${bet.player.id} checks`)
-        }
+        this.log(LogType.PotLog, `${bet.player.id} checks`)
         break;
       case (Action.SmallBlind):
         // validation 
-        if (logger) {
-          logger.log(LogType.PotLog, `${bet.player.id} posted small blind`)
-        }
+        this.log(LogType.PotLog, `${bet.player.id} posted small blind`)
+        this.increasePot(bet);
+        break;
       case (Action.Call):
         // validation
-        if (logger) {
-          logger.log(LogType.PotLog, `${bet.player.id} calls`)
-        }
+        this.log(LogType.PotLog, `${bet.player.id} calls`)
         this.increasePot(bet);
         break;
       case (Action.BigBlind):
         // validation 
-        if (logger) {
-          logger.log(LogType.PotLog, `${bet.player.id} posted big blind`)
-        }
+        this.log(LogType.PotLog, `${bet.player.id} posted big blind`)
+        this.increasePot(bet, true);
+        break;
       case (Action.Bet):
         // validation 
-        if (logger) {
-          logger.log(LogType.PotLog, `${bet.player.id} bets`)
-        }
+        this.log(LogType.PotLog, `${bet.player.id} bets`)
+        this.increasePot(bet, true);
+        break;
       case (Action.Raise):
         // validation
-        if (logger) {
-          logger.log(LogType.PotLog, `${bet.player.id} raises`)
-        }
+        this.log(LogType.PotLog, `${bet.player.id} raises`)
         this.increasePot(bet, true);
         break;
       case (Action.Fold):
-        if (logger) {
-          logger.log(LogType.PotLog, `${bet.player.id} folds`)
-        }
+        this.log(LogType.PotLog, `${bet.player.id} folds`)
         this.removePlayer(bet.player)
         break;
       case (Action.AllIn):
         // validation
-        if (logger) {
-          logger.log(LogType.PotLog, `${bet.player.id} goes all-in`)
-        }
+        this.log(LogType.PotLog, `${bet.player.id} goes all-in`)
         this.splitPot(bet);
         break;
     }
@@ -116,38 +107,17 @@ export class TotalPot {
     this._subpots.push(this.createPot(this.activePlayers, this.currentRound + 1))
   }
 
-  dividePot(playersRanked: Player[][], logger?: Logger) {
+  dividePot(playersRanked: Player[][]) {
     for(let pot of this._subpots) {
-      // for (let i = 0; i < playersRanked.length; i++) {
-      //   const player = playersRanked[i]
-      //   if (pot.players.get(player)) {
-      //     if (draw && draw.includes(i)) {
-      //       const amount = pot.size / draw.length;
-      //       player.winPot(amount)
-      //       if (logger) {
-      //         logger.log(LogType.PotLog, `It's a draw! ${player.id} wins ${amount}`)
-      //       }
-      //     }
-      //     else {
-      //       player.winPot(pot.size)
-      //       if (logger) {
-      //         logger.log(LogType.PotLog, `${player.id} wins ${pot.size}`)
-      //       }
-      //       break;
-      //     }
-      //   }
-      // }
       for (let players of playersRanked) {
         players = players.filter(p => pot.players.get(p) !== undefined)
-        if (logger && players.length > 1) {
-          logger.log(LogType.PotLog, `It's a draw!`)
+        if (players.length > 1) {
+          this.log(LogType.PotLog, `It's a draw!`);
         }
         for (let player of players) {
           const amount = pot.size / players.length
           player.winPot(amount)
-          if (logger) {
-            logger.log(LogType.PotLog, `${player.id} wins ${amount}`)
-          }
+          this.log(LogType.PotLog, `${player.id} wins ${amount}`)
         }
         if (players.length !== 0)
           break;
@@ -173,17 +143,50 @@ export class TotalPot {
     for(let pot of this._subpots) {
       pot.players.delete(player);
     }
-    this._players.splice(this._players.findIndex(p => p.player === player))
+    this._players.splice(this._players.findIndex(p => p.player === player), 1)
   }
 
   private splitPot(bet: Bet) {
-    // TODO: Add all-in bets handling!!! 
+    
+    // console.log(bet)
     const player = this._players.find(p => p.player === bet.player);
+    // console.log(this._subpots)
+    // console.log(player)
     const playerCurrentBet = this._currentPot.players.get(bet.player);
-    if (!player || !playerCurrentBet)
+    if (!player || playerCurrentBet === undefined)
       throw new Error('[POT_ERROR] Player not in the pot went all in!');
-    player.allIn = true;
-
+    // For 2 players it works
+    if (bet.amount + playerCurrentBet >= this.currentBet) {
+      const amount = (this.currentBet - playerCurrentBet)
+      const leftoverAmount = bet.amount - amount 
+      // this.increasePot({ ...bet, amount });
+      // this._subpots.push(this.createPot(this.activePlayers, this.currentRound))
+      this.increasePot({ ...bet, amount: bet.amount }, true);
+      player.allIn = true;
+    }
+    else {
+      player.allIn = true;
+      // For 2 players works, not for more
+      this.increasePot(bet)
+      const prevPot = this.currentPot;
+      this._subpots.push(this.createPot(this.activePlayers, this.currentRound))
+      for (let player of this.activePlayers) {
+        const leftoverAmount = prevPot.players.get(player);
+        if (!leftoverAmount) 
+          throw new Error()
+        if (leftoverAmount > bet.amount) {
+          const betDiff = leftoverAmount - bet.amount
+          prevPot.players.set(player, bet.amount)
+          prevPot.size -= betDiff
+          // works only for 2 ppl
+          this.increasePot({
+            amount: betDiff,
+            action: Action.Raise,
+            player
+          }, true)
+        }
+      }
+    }
   }
 
   private createPot(players: Player[], round: BettingRound) {

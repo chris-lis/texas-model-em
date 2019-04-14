@@ -1,63 +1,87 @@
-import React, { FunctionComponent, useState, useEffect } from 'react';
-import logo from './logo.svg';
+import React, { FunctionComponent, useState, useEffect, useRef } from 'react';
 import './App.css';
 import { Deck, Card, printCards } from './game/deck';
-import { Table } from './game/table';
-import { AIPlayer } from './game/player';
+// import { Table } from './game/table';
+import { AIPlayer, HumanPlayer, Player } from './game/player';
 import { Logger, LogType } from './game/logger';
+import { TotalPot, Action } from './game/pot';
+import { PlayerDetails, PlayerStats } from './components/player-details';
+import { Game } from './components/game';
+import { Table } from './components/table';
+import { callingMachine, randomDeicde, callRaiseMachine, raisingMachine } from './game/decide';
+import { AI } from './game/ai';
 
-const player1 = new AIPlayer(100, 0, 'Player1')
-const player2 = new AIPlayer(100, 0, 'Player2')
+// const player1 = new HumanPlayer(100, 0, 'Player1', (pot: TotalPot, board: Card[], player: Player) => {
+//   window.prompt('Pick a move (0 - check/call, 1 - bet/raise, 2 - fold')
+//   const amountInPot = pot.currentPot.players.get(player);
+//   if (amountInPot === undefined)
+//     throw new Error('[PLAYER_ERROR] Player doenst belong to the pot!')
 
-const table = new Table([player1, player2])
+//   const amount = pot.currentBet - amountInPot;
+//   player.bet(amount);
+//   return {
+//     amount: amount,
+//     action: amount === 0 ? Action.Check : Action.Call,
+//     player,
+//   }
+// })
+
+
+
+
+// const table = new Table(players)
 
 const App: FunctionComponent = (props) => {
+  // const logger = new Logger()
+  
+  // const [logs, setLogs] = useState(logger.logs);
+  // const [playerStats, setPlayerStats] = useState(players.map((p) => ({
+  //   id: p.id,
+  //   stack: p.stack,
+  //   hand: printCards(p.hand),
+  //   active: table.activePlayers.includes(p)
+  // } as PlayerStats)))
 
-  const logger = new Logger()
+  // const [humanControlActive, setHumanControlActive] = useState(false);
 
-  const [logs, setLogs] = useState(logger.logs);
-  const [player1stats, setPlayer1stats] = useState(player1)
-  const [player2stats, setPlayer2stats] = useState(player2)
+  // const updatePlayerStats = (player: Player) => {
+  //   const newStats = [...playerStats];
+  //   let i = newStats.findIndex(p => p.id === player.id)
+  //   newStats[i] = {
+  //     id: player.id,
+  //     stack: player.stack,
+  //     hand: printCards(player.hand),
+  //     active: table.activePlayers.includes(player)
+  //   }
+  //   setPlayerStats(newStats)
+  // }
+
+  // for (let player of players) {
+  //   player.updateStats = () => updatePlayerStats(player)
+  // }
+
+  const [table, setTable] = useState(<div />);
+  const refreshFlagRef = useRef(0);
+
+  const humanPlayer = new HumanPlayer(100, 0, 'HumanPlayer');
+  const players = [
+    new AIPlayer(50, 0, 'Player1', new AI()),
+    new AIPlayer(50, 0, 'Player2', new AI(), callingMachine),
+    // new AIPlayer(100, 0, 'Player3'),
+  ]
+
 
   return (
     <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+      {/* <Game players={playerStats} />  */}
+      
       <button onClick={() => {
-        table.nextDeal(logger).then(() => {
-          setLogs(logger.logs);
-          setPlayer1stats(player1);
-          setPlayer2stats(player2);
-        })
-      }}>play a deal</button>
-      <p>
-        {logs.map((l, i) => (
-          <b key={i}>
-            [{LogType[l.type]}] {l.message}<br/>
-          </b>))}
-      </p>
-      <div>
-        {player1stats.id}
-        {printCards(player1stats.hand)}
-        {player1stats.stack}
-      </div>
-      <div>
-        {player2.id}
-        {printCards(player2stats.hand)}
-        {player2stats.stack}
-      </div>
+        refreshFlagRef.current = refreshFlagRef.current === 0 ? 1 : 0;
+
+        setTable(<Table key={refreshFlagRef.current} aiPlayers={players} showAiCards={true} />)
+        }
+      }>create a table</button>
+      {table}
     </div>
   )
 }
