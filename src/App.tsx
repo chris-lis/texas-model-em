@@ -65,8 +65,8 @@ const App: FunctionComponent = (props) => {
 
   const humanPlayer = new HumanPlayer(100, 0, 'HumanPlayer');
   const players = [
-    new AIPlayer(50, 0, 'Player1', new AI()),
-    new AIPlayer(50, 0, 'Player2', new AI(), callingMachine),
+    new AIPlayer(200, 0, 'Player1', new AI()),
+    new AIPlayer(200, 0, 'Player2', new AI(), callingMachine),
     // new AIPlayer(100, 0, 'Player3'),
   ]
 
