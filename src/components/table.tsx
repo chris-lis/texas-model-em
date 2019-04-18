@@ -167,7 +167,7 @@ export const Table: FunctionComponent<TableProps> = (props) => {
             <PlayerDetails key={i} {...player}/>
           ))}
           <button disabled={playerQueueRef.current.filter(p => p.stack >= 1).length <= 1} onClick={() => newDeal()}>play next deal</button>
-          {!props.humanPlayer && <button disabled={playerQueueRef.current.filter(p => p.stack >= 1).length <= 1} onClick={async () => {
+          {false && <button disabled={playerQueueRef.current.filter(p => p.stack >= 1).length <= 1} onClick={async () => {
               for (let i = 0; i < 100; i++) {
                 await newDeal();
                 // await setTimeout(() => {}, 1000)

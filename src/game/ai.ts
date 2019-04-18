@@ -1,7 +1,8 @@
 import * as tf from '@tensorflow/tfjs';
 
 export class AI {
-  private batchSize = 3;
+  private batchSize = 2;
+  private stdWin = 4;
   public model: tf.Sequential;
   protected actionHistory: number[][] = [];
   protected predictionHistory: tf.Tensor2D[] = [];
@@ -15,12 +16,12 @@ export class AI {
     // const state = stateRaw.transpose();
     const predictionRaw = this.model.predict(state)
     const prediction: tf.Tensor<tf.Rank.R2> = Array.isArray(predictionRaw) ? predictionRaw[0].reshape([1, 3]) : predictionRaw.reshape([1, 3]);
-    console.log(prediction.arraySync()) 
+    // console.log(prediction.arraySync()) 
     const action = tf.multinomial(prediction, 1).flatten().arraySync()
     this.actionHistory.push(action)
     this.predictionHistory.push(prediction)
     this.stateHistory.push(state)
-    console.log(action)
+    // console.log(action)
     return action[0];
   }
 
@@ -30,42 +31,36 @@ export class AI {
     const actions = this.actionHistory;
 
     const length = this.batchSize <= predictions.length ? this.batchSize : predictions.length;
+    const data: tf.Tensor2D[] = [];
+    const labels: tf.Tensor2D[] = [];
+    
+    for (let i = 0; i < length; i++) {
+      const j = Math.floor(Math.random() * predictions.length)
+      data.push(states[j]);
+      let label: tf.Tensor2D;
+      const intermLabel = predictions[j].flatten().arraySync();
+      intermLabel[actions[j][0]] *= (1 + reward / this.stdWin)
+      intermLabel[(actions[j][0] + 1) % 3] *= (1 - reward / (2 * this.stdWin))
+      intermLabel[(actions[j][0] + 2) % 3] *= (1 - reward / (2 * this.stdWin))
+
+      label = tf.oneHot(tf.multinomial(intermLabel, 1), 3).reshape([1, 3])
+      labels.push(label)
+      
+      actions.splice(j, 1);
+      states.splice(j, 1);
+      predictions.splice(j, 1);
+    }
     if (length >= this.batchSize) {
-      const data: tf.Tensor2D[] = [];
-      const labels: tf.Tensor2D[] = [];
-
-      for (let i = 0; i < length; i++) {
-        const j = Math.floor(Math.random() * predictions.length)
-        data.push(states[j]);
-        let label: tf.Tensor2D;
-        if (reward >= 0) {
-          label = tf.oneHot(actions[j], 3).reshape([1,3])
-          labels.push(label)
-        }
-        else {
-          // If not pick fake label at random with reversed prob.
-          // const reversed: tf.Tensor<tf.Rank.R1> = tf.ones([3]).sub(predictions[j]);
-          const intermLabel = predictions[j].flatten().arraySync();
-          intermLabel[actions[j][0]] /= Math.abs(reward)
-          label = tf.oneHot(tf.multinomial(intermLabel, 1), 3).reshape([1, 3])
-          labels.push(label)
-        }
-
-        actions.splice(j, 1);
-        states.splice(j, 1);
-        predictions.splice(j, 1);
-      }
-      const dataTensor = tf.stack(data.map(d => d.flatten()), 0);
-      const labelTensor = tf.stack(labels.map(l => l.flatten()), 0);
+      const dataTensor = tf.stack(data.splice(0, 5).map(d => d.flatten()), 0);
+      const labelTensor = tf.stack(labels.splice(0, 5).map(l => l.flatten()), 0);
       await this.model.fit(dataTensor, labelTensor, {
         batchSize: length,
         shuffle: true,
       });
-      
+      this.actionHistory = []
+      this.predictionHistory = [];
+      this.stateHistory = [];
     }
-    this.actionHistory = []
-    this.predictionHistory = [];
-    this.stateHistory = [];
   }
 
   protected createModel() {
