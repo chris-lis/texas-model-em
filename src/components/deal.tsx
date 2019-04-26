@@ -27,12 +27,7 @@ export const Deal: FunctionComponent<DeapProps> = (props) => {
     p.stack
   ));
 
-  const addCardsToBoard = (cards: Card[]) => {
-    const nextBoard = [...board];
-    nextBoard.concat(cards);
-    setBoard(nextBoard);
-    props.log(LogType.DealLog, `Board has been dealt: ${printCards(cards)}`);
-  }
+
   const getNextPlayer = (queue: Player[]) => {
     // const queue = [...bettingQueue]
     const player = queue.shift();
@@ -41,9 +36,6 @@ export const Deal: FunctionComponent<DeapProps> = (props) => {
     // setBettingQueue(queue);
     return player;
   }
-
-  const addPlayersToQueue = (players: Player[]) => setBettingQueue([...bettingQueue, ...players]);
-  const addPlayerToAfterBettingQueue = (player: Player) => setAfterBettingQueue([...afterBettingQueue, player]);
 
   const prepareRound = (board: Card[], currentRound: BettingRound) => {
     let bettingQueue = props.pot.activePlayers.length > 1 ? props.pot.activePlayers : [];

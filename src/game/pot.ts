@@ -1,5 +1,5 @@
 import { Player } from './player';
-import { Logger, LogType } from './logger';
+import { LogType } from './logger';
 
 export enum Action {
   Call,
@@ -147,7 +147,7 @@ export class TotalPot {
   }
 
   private splitPot(bet: Bet) {
-    
+    // TODO: Make this work. 
     // console.log(bet)
     const player = this._players.find(p => p.player === bet.player);
     // console.log(this._subpots)

@@ -1,73 +1,40 @@
 import React, { FunctionComponent, useState, useEffect, useRef } from 'react';
 import './App.css';
-import { Deck, Card, printCards } from './game/deck';
-// import { Table } from './game/table';
 import { AIPlayer, HumanPlayer, Player } from './game/player';
-import { Logger, LogType } from './game/logger';
-import { TotalPot, Action } from './game/pot';
-import { PlayerDetails, PlayerStats } from './components/player-details';
-import { Game } from './components/game';
-import { Table } from './components/table';
-import { callingMachine, randomDeicde, callRaiseMachine, raisingMachine } from './game/decide';
+import { callingMachine, random, callRaiseMachine, raisingMachine } from './game/decide';
 import { AI } from './game/ai';
-
-// const player1 = new HumanPlayer(100, 0, 'Player1', (pot: TotalPot, board: Card[], player: Player) => {
-//   window.prompt('Pick a move (0 - check/call, 1 - bet/raise, 2 - fold')
-//   const amountInPot = pot.currentPot.players.get(player);
-//   if (amountInPot === undefined)
-//     throw new Error('[PLAYER_ERROR] Player doenst belong to the pot!')
-
-//   const amount = pot.currentBet - amountInPot;
-//   player.bet(amount);
-//   return {
-//     amount: amount,
-//     action: amount === 0 ? Action.Check : Action.Call,
-//     player,
-//   }
-// })
-
-
-
-
-// const table = new Table(players)
+import { Logger, LogType } from './game/logger';
+import { Game } from './components/game';
+import { Table } from './game/table';
+import { VictoryChart, VictoryLine } from 'victory';
 
 const App: FunctionComponent = (props) => {
-  // const logger = new Logger()
-  
-  // const [logs, setLogs] = useState(logger.logs);
-  // const [playerStats, setPlayerStats] = useState(players.map((p) => ({
-  //   id: p.id,
-  //   stack: p.stack,
-  //   hand: printCards(p.hand),
-  //   active: table.activePlayers.includes(p)
-  // } as PlayerStats)))
-
-  // const [humanControlActive, setHumanControlActive] = useState(false);
-
-  // const updatePlayerStats = (player: Player) => {
-  //   const newStats = [...playerStats];
-  //   let i = newStats.findIndex(p => p.id === player.id)
-  //   newStats[i] = {
-  //     id: player.id,
-  //     stack: player.stack,
-  //     hand: printCards(player.hand),
-  //     active: table.activePlayers.includes(player)
-  //   }
-  //   setPlayerStats(newStats)
-  // }
-
-  // for (let player of players) {
-  //   player.updateStats = () => updatePlayerStats(player)
-  // }
-  const [table, setTable] = useState(<div />);
-  const refreshFlagRef = useRef(0);
-
   const [p1name, setP1name] = useState('Player 1')
   const [p2name, setP2name] = useState('Player 2')
   const [p1stack, setP1stack] = useState(200)
   const [p2stack, setP2stack] = useState(200)
   const [p1ai, setP1ai] = useState(true)
   const [p2ai, setP2ai] = useState(true)
+
+  const [logger, setLogger] = useState(new Logger());
+  const [table, setTable] = useState(undefined as (undefined | Table))
+  const [players, setPlayers] = useState([] as Player[])
+
+  const createTable = () => {
+    let logger = new Logger();
+    const log = (type: LogType, message: string) => {
+      logger.log(type, message);
+      console.log(logger.logs);
+      setLogger(new Logger(logger));
+    }
+    let players = [
+      p1ai ? new AIPlayer(p1stack, p1name, new AI()) : new AIPlayer(p1stack, p1name, new AI(), random),
+      p2ai ? new AIPlayer(p2stack, p2name, new AI()) : new AIPlayer(p2stack, p2name, new AI(), random),
+    ]
+    setLogger(logger);
+    setPlayers(players)
+    setTable(new Table(players, log));
+  }
 
   return (
     <div className="App">
@@ -85,19 +52,17 @@ const App: FunctionComponent = (props) => {
         AI player?: <input type="checkbox" checked={p2ai} onClick={() => setP2ai(s => !s)} />
         <br />
       </div>
-      <button onClick={() => {
-        refreshFlagRef.current = refreshFlagRef.current === 0 ? 1 : 0;
-        const humanPlayer = new HumanPlayer(100, 0, 'HumanPlayer');
-        const players = [
-          p1ai ? new AIPlayer(p1stack, 0, p1name, new AI()) : new AIPlayer(p1stack, 0, p1name, new AI(), randomDeicde),
-          p2ai ? new AIPlayer(p2stack, 0, p2name, new AI()) : new AIPlayer(p2stack, 0, p2name, new AI(), randomDeicde),
-          // new AIPlayer(100, 0, 'Player3'),
-        ]
-
-          setTable(<Table key={refreshFlagRef.current} aiPlayers={players} showAiCards={true} />)
-        }
-      }>create a table</button>
-      {table}
+      <button onClick={createTable}>
+        create new table
+      </button>
+      {table && <Game table={table} players={players} aiOnly={true} showAiCards={true} />}
+      <div>
+        <p>
+          {logger.logs.reverse().map((log, i) => (
+            <span key={i}><b>[{LogType[log.type]}]</b> {log.message}<br /></span>
+          ))}
+        </p>
+      </div>
     </div>
   )
 }

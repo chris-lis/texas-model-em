@@ -59,14 +59,6 @@ export class Deck {
     }
     return card;
   }
-
-  public print() {
-    let deck = `Deck (in order):\n`;
-    for (const card of this.deck) {
-      deck += `   ${card.value} of ${card.suit}\n`;
-    }
-    return deck;
-  }
 }
 
 export function printCard(card: Card) {

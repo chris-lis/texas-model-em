@@ -1,5 +1,4 @@
 import React, { FunctionComponent } from 'react';
-import { Card } from '../game/deck';
 
 export interface PlayerStats {
   id: string;

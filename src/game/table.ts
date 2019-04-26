@@ -1,44 +1,32 @@
 import { Player } from './player';
 import { Deal } from './deal';
-import { Logger, LogType } from './logger';
+import { LogType } from './logger';
+
+const MIN_STACK = 16
 
 export class Table {
-  get players() { return {...this._players}}
-  get activePlayers() { return this._players.filter(p => p.stack > 0) }
-  constructor(protected _players: Player[]) {
-    let btn = Math.floor(Math.random() * _players.length);
+  playerQueue: Player[];
+  deal: Deal;
+
+  constructor(public readonly players: Player[], public log: (type: LogType, message: string) => void) {
+    this.playerQueue = players.filter(p => p.stack >= MIN_STACK)
+    const btn = Math.floor(Math.random() * this.playerQueue.length);
     for (let i = 0; i < btn; i++) {
       this.shiftPosition();
     }
-    this.updateStats = () => {
-      for (let player of _players) {
-        player.updateStats()
-      }
-    }
+    this.deal = new Deal(this.playerQueue, log);
   }
 
-  shiftPosition() {
-    const player = this._players.shift()
+  prepareNextDeal() {
+    this.playerQueue = this.playerQueue.filter(p => p.stack >= MIN_STACK);
+    this.shiftPosition();
+    this.deal = new Deal(this.playerQueue, this.log);
+  }  
+
+  protected shiftPosition() {
+    const player = this.playerQueue.shift()
     if (!player)
       throw new Error('[TABLE_ERROR] Trying to shift position at an empty table!');
-    this._players.push(player);
+    this.playerQueue.push(player);
   }
-
-  async nextDeal(logger?: Logger) {
-    if (logger) {
-      let players = ''
-      for(let player of this.activePlayers) {
-        players += ` ${player.id}`
-      }
-      logger.log(LogType.TableLog, `New deal. Players:${players}`);
-      logger.log(LogType.TableLog, `BTN: ${this.activePlayers[0].id}`)
-    }
-    this.shiftPosition()
-    const deal = new Deal(this.activePlayers, this.updateStats);
-    await deal.play(logger)
-    if (logger)
-      logger.log(LogType.TableLog, 'Deal finished. Cleaning up.')
-  }
-
-  updateStats: () => void;
 }

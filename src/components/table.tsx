@@ -31,10 +31,6 @@ const shiftPosition = (players: Player[]) => {
   players.push(player);
 }
 
-function delay(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
 export const Table: FunctionComponent<TableProps> = (props) => {
   const playersRef = useRef(props.humanPlayer ? [props.humanPlayer, ...props.aiPlayers] : [...props.aiPlayers])
 
@@ -167,7 +163,7 @@ export const Table: FunctionComponent<TableProps> = (props) => {
             <PlayerDetails key={i} {...player}/>
           ))}
           <button disabled={playerQueueRef.current.filter(p => p.stack >= 1).length <= 1} onClick={() => newDeal()}>play next deal</button>
-          {false && <button disabled={playerQueueRef.current.filter(p => p.stack >= 1).length <= 1} onClick={async () => {
+          {!props.humanPlayer && <button disabled={playerQueueRef.current.filter(p => p.stack >= 1).length <= 1} onClick={async () => {
               for (let i = 0; i < 100; i++) {
                 await newDeal();
                 // await setTimeout(() => {}, 1000)

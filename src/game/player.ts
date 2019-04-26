@@ -3,9 +3,6 @@ import * as tf from '@tensorflow/tfjs';
 
 import { Card } from './deck';
 import { Action, Bet, TotalPot, BettingRound } from './pot';
-import { TablePosition } from './deal';
-import { string } from 'prop-types';
-import { createModel } from './decide';
 import { AI } from './ai';
 
 export interface PlayerStrategy { 
@@ -20,7 +17,6 @@ export interface Player {
   hand: Card[];
   playerStrategies: Map<Player, Map<string, PlayerStrategy>>;
   stack: number;
-  position: TablePosition;
   decide(pot: TotalPot, board: Card[]): Bet;
   smallBlind(): Bet;
   bigBlind(): Bet;
@@ -32,13 +28,17 @@ export interface Player {
   updateStrategies(pot: TotalPot): void;
 }
 
+// abstract class BasePlayer implements Player {
+
+// }
+
 export class AIPlayer implements Player {
   public hand: Card[] = [];
   public playerStrategies = new Map<Player, Map<string,PlayerStrategy>>();
 
   public updateStats = () => {}
 
-  constructor(public stack: number, public position: TablePosition, public id: string, public ai: AI, public decisionFunction?: (...args: any) => number) { }
+  constructor(public stack: number, public id: string, public ai: AI, public decisionFunction?: (...args: any) => number) { }
   
   updateStrategies(pot: TotalPot) {
     let betHistory = pot.betHistory
@@ -98,7 +98,7 @@ export class AIPlayer implements Player {
       const opponentStrategy = this.playerStrategies.get(opponent)
       let strategyVec: number[] = []
       if (!opponentStrategy) {
-        strategyVec = [1 / 3, 1 / 3, 1 / 3];
+        strategyVec = [1 / 3, 1 / 3, 1 / 3, 1 / 3, 1 / 3, 1 / 3];
       }
       else {
         let key = '';
@@ -113,13 +113,30 @@ export class AIPlayer implements Player {
             key += '0';
           }
         }
-        
-        const strategy = opponentStrategy.get(key);
-        if (strategy && strategy.betsTotal > 10) {
-          strategyVec = [strategy.checkCallTotal / strategy.betsTotal, strategy.raiseBetTotal / strategy.betsTotal, strategy.foldTotal / strategy.betsTotal];
+
+        let predictedStrategy: PlayerStrategy = {
+          betsTotal: 0,
+          checkCallTotal: 0,
+          raiseBetTotal: 0,
+          foldTotal: 0,
+        };
+        const strategy0 = opponentStrategy.get(key + '0');
+        const strategy1 = opponentStrategy.get(key + '1');
+
+        if (strategy0 && strategy0.betsTotal > 10) {
+          strategyVec = [strategy0.checkCallTotal / strategy0.betsTotal, strategy0.raiseBetTotal / strategy0.betsTotal, strategy0.foldTotal / strategy0.betsTotal];
+          if (strategy1 && strategy1.betsTotal > 10) {
+            strategyVec = strategyVec.concat([strategy1.checkCallTotal / strategy1.betsTotal, strategy1.raiseBetTotal / strategy1.betsTotal, strategy1.foldTotal / strategy1.betsTotal])
+          }
+          else {
+            strategyVec = strategyVec.concat([1 / 3, 1 / 3, 1 / 3]);
+          }
         }
+        else if (strategy1 && strategy1.betsTotal > 10) {
+          strategyVec = [1 / 3, 1 / 3, 1 / 3,strategy1.checkCallTotal / strategy1.betsTotal, strategy1.raiseBetTotal / strategy1.betsTotal, strategy1.foldTotal / strategy1.betsTotal]
+        } 
         else {
-          strategyVec = [1 / 3, 1 / 3, 1 / 3];
+          strategyVec = [1 / 3, 1 / 3, 1 / 3, 1 / 3, 1 / 3, 1 / 3];
         }
       }
 
@@ -132,7 +149,7 @@ export class AIPlayer implements Player {
       features.push(pot.size);
 
       // console.log(features)
-      decision = this.ai.predict(tf.tensor2d(features, [1,56], 'float32'))
+      decision = this.ai.predict(tf.tensor2d(features, [1,59], 'float32'))
     }
     if (decision === 0) {
       const amount = pot.currentBet - amountInPot;
@@ -243,7 +260,7 @@ export class HumanPlayer implements Player {
   public updateStats = () => { }
 
 
-  constructor(public stack: number, public position: TablePosition, public id: string) { }
+  constructor(public stack: number, public id: string) { }
 
   public decide(pot: TotalPot, board: Card[]): Bet {
     return {} as Bet

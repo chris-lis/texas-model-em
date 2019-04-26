@@ -1,65 +1,73 @@
 import * as tf from '@tensorflow/tfjs';
 
+interface Snapshot {
+  action: number;
+  reward?: number;
+  prediction: tf.Tensor2D;
+  state: tf.Tensor2D;
+}
+
 export class AI {
-  private batchSize = 2;
-  private stdWin = 4;
+  private batchSize = 5;
+  private stdWin = 1;
   public model: tf.Sequential;
-  protected actionHistory: number[][] = [];
-  protected predictionHistory: tf.Tensor2D[] = [];
-  protected stateHistory: tf.Tensor2D[] = [];
+  protected history: Snapshot[] = []
 
   constructor() {
     this.model = this.createModel();
   }
   
   predict(state: tf.Tensor2D) {
-    // const state = stateRaw.transpose();
     const predictionRaw = this.model.predict(state)
     const prediction: tf.Tensor<tf.Rank.R2> = Array.isArray(predictionRaw) ? predictionRaw[0].reshape([1, 3]) : predictionRaw.reshape([1, 3]);
-    // console.log(prediction.arraySync()) 
-    const action = tf.multinomial(prediction, 1).flatten().arraySync()
-    this.actionHistory.push(action)
-    this.predictionHistory.push(prediction)
-    this.stateHistory.push(state)
-    // console.log(action)
-    return action[0];
+    const action = tf.multinomial(prediction, 1).flatten().arraySync()[0]
+
+    this.history.push({
+      action,
+      prediction,
+      state
+    })
+    return action;
   }
 
   async trainModel(reward: number) {
-    const predictions = this.predictionHistory;
-    const states = this.stateHistory;
-    const actions = this.actionHistory;
-
-    const length = this.batchSize <= predictions.length ? this.batchSize : predictions.length;
-    const data: tf.Tensor2D[] = [];
-    const labels: tf.Tensor2D[] = [];
-    
-    for (let i = 0; i < length; i++) {
-      const j = Math.floor(Math.random() * predictions.length)
-      data.push(states[j]);
-      let label: tf.Tensor2D;
-      const intermLabel = predictions[j].flatten().arraySync();
-      intermLabel[actions[j][0]] *= (1 + reward / this.stdWin)
-      intermLabel[(actions[j][0] + 1) % 3] *= (1 - reward / (2 * this.stdWin))
-      intermLabel[(actions[j][0] + 2) % 3] *= (1 - reward / (2 * this.stdWin))
-
-      label = tf.oneHot(tf.multinomial(intermLabel, 1), 3).reshape([1, 3])
-      labels.push(label)
-      
-      actions.splice(j, 1);
-      states.splice(j, 1);
-      predictions.splice(j, 1);
+    // Update action rewards
+    for (let snapshot of this.history) {
+      if (snapshot.reward === undefined)
+        snapshot.reward = reward;
     }
-    if (length >= this.batchSize) {
-      const dataTensor = tf.stack(data.splice(0, 5).map(d => d.flatten()), 0);
-      const labelTensor = tf.stack(labels.splice(0, 5).map(l => l.flatten()), 0);
+    // if we have enough data, update the model
+    if (this.history.length > this.batchSize) {
+      const trainingData: tf.Tensor2D[] = [];
+      const trainingLabels: tf.Tensor2D[] = [];
+
+      for (let i = 0; i < this.batchSize; i++) {
+        // Pick a histry entry at random
+        const j = Math.floor(Math.random() * history.length)
+      
+        const snapshot = this.history.splice(j, 1)[0];
+
+        // Something went wrong and reward wasn't set in history yet
+        if (snapshot.reward === undefined)
+          throw new Error('Reward not set in training example!');
+        
+        trainingData.push(snapshot.state);
+
+        // To train model we create a fake label -> a label generated with probability distribution "punished" or "rewarded" as compared to original one
+        const prediction = snapshot.prediction.flatten().arraySync();
+        prediction[snapshot.action] *= (1 + snapshot.reward / this.stdWin);
+        prediction[(snapshot.action + 1) % 3] *= (1 - snapshot.reward / (2 * this.stdWin))
+        prediction[(snapshot.action + 2) % 3] *= (1 - snapshot.reward / (2 * this.stdWin))
+
+        trainingLabels.push(tf.oneHot(tf.multinomial(prediction, 1), 3).reshape([1, 3]));
+      }
+
+      const dataTensor = tf.stack(trainingData.map(d => d.flatten()), 0);
+      const labelTensor = tf.stack(trainingLabels.map(l => l.flatten()), 0);
       await this.model.fit(dataTensor, labelTensor, {
-        batchSize: length,
+        batchSize: this.batchSize,
         shuffle: true,
       });
-      this.actionHistory = []
-      this.predictionHistory = [];
-      this.stateHistory = [];
     }
   }
 
@@ -68,8 +76,8 @@ export class AI {
 
     model.add(tf.layers.dense({
       units: 32,
-      inputShape: [56],
-      batchInputShape: [this.batchSize, 56],
+      inputShape: [59],
+      batchInputShape: [this.batchSize, 59],
       activation: 'relu'
     }))
 
@@ -100,16 +108,6 @@ export class AI {
       loss: tf.losses.softmaxCrossEntropy,
       metrics: ['accuracy']
     })
-
-    // model.add(tf.layers.conv2d({
-    //   inputShape: [13, 4, 3],
-    //   kernelSize: 5,
-    //   filters: 8,
-    //   strides: 1,
-    //   activation: 'relu',
-    //   kernelInitializer: 'varianceScaling'
-    // }));
-
 
     return model;
   }
