@@ -74,9 +74,9 @@ export const Game: FunctionComponent<GameProps> = props => {
       <button onClick={startDeal}>
         play round
       </button>
-      <button onClick={play100deals}>
+      {/* <button onClick={play100deals}>
         play 100 rounds
-      </button>
+      </button> */}
       <div style={{ maxWidth: '500px', margin: '0 auto' }}>
         <VictoryChart>
           <VictoryLine data={stackSizeP1} style={{ data: { stroke: "#c43a31" }, }} />
